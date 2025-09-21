@@ -3,32 +3,40 @@
 
 <head>
   <meta charset="UTF-8" />
-  <title>Ombor boshqaruvi</title> <!-- jsPDF kutubxonasi (PDF yaratish uchun) -->
+  <title>Ombor boshqaruvi</title>
+  <!-- jsPDF + AutoTable -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
   <h1>📦 Ombor boshqaruvi</h1>
-  <form id="product-form"> <input type="hidden" id="edit-index" /> <label>Kod: <input type="text" id="product-code"
-        required /></label> <label>Nomi: <input type="text" id="product-name" required /></label> <label>O‘lcham
-      (o‘lchov birlikka qarab): <input type="number" id="product-size" step="0.001" min="0" required /></label>
-    <label>Miqdor (dona yoki kg): <input type="number" id="product-quantity" step="0.001" min="0" required /></label>
+
+  <form id="product-form">
+    <input type="hidden" id="edit-index" />
+    <label>Kod: <input type="text" id="product-code" required /></label>
+    <label>Nomi: <input type="text" id="product-name" required /></label>
+    <label>O‘lcham (m²): <input type="number" id="product-size" step="0.001" min="0" required /></label>
+    <label>Miqdor (dona): <input type="number" id="product-quantity" step="0.001" min="0" required /></label>
     <label>Olish narxi (USD): <input type="number" id="product-cost-price-usd" step="0.01" min="0" /></label>
-    <label>Sotish narxi (USD): <input type="number" id="product-sale-price-usd" step="0.01" min="0" /></label> <label>$
-      kursi: <input type="number" id="dollar-rate" value="12500" min="0" required /></label> <label>Kategoriya: <select
-        id="product-category" required>
+    <label>Sotish narxi (USD): <input type="number" id="product-sale-price-usd" step="0.01" min="0" /></label>
+    <label>$ kursi: <input type="number" id="dollar-rate" value="12500" min="0" required /></label>
+    <label>Kategoriya:
+      <select id="product-category" required>
         <option value="luxury">Luxury</option>
-        <option value="donali">Donali</option>
-        <option value="pachkali">Pachkali</option>
         <option value="golden_art_floor">Golden Art Floor</option>
-        <option value="kiloli">Kiloli</option>
-      </select> </label> <button type="submit">➕ Saqlash</button>
+      </select>
+    </label>
+    <button type="submit">➕ Saqlash</button>
   </form>
-  <hr /> <label>Kodni qidirish: <input type="text" id="search-code" placeholder="Kod..." /></label> <button
-    id="save-sales-pdf">📑 Sotilganlarni PDF saqlash</button> <!-- Har bir kategoriya uchun jadval -->
-  <h2>Luxury va boshqa</h2>
+
+  <hr />
+
+  <label>Kodni qidirish: <input type="text" id="search-code" placeholder="Kod..." /></label>
+  <button id="save-pdf">📑 PDF saqlash (har kunlik)</button>
+
+  <h2>Luxury</h2>
   <table>
     <thead>
       <tr>
@@ -42,34 +50,7 @@
     </thead>
     <tbody id="luxury-table"></tbody>
   </table>
-  <h2>Donali</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Kod</th>
-        <th>Nomi</th>
-        <th>Miqdor</th>
-        <th>Olish narxi</th>
-        <th>Sotish narxi</th>
-        <th>Amallar</th>
-      </tr>
-    </thead>
-    <tbody id="donali-table"></tbody>
-  </table>
-  <h2>Pachkali</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Kod</th>
-        <th>Nomi</th>
-        <th>Miqdor</th>
-        <th>Olish narxi</th>
-        <th>Sotish narxi</th>
-        <th>Amallar</th>
-      </tr>
-    </thead>
-    <tbody id="pachkali-table"></tbody>
-  </table>
+
   <h2>Golden Art Floor</h2>
   <table>
     <thead>
@@ -84,21 +65,10 @@
     </thead>
     <tbody id="golden-art-floor-table"></tbody>
   </table>
-  <h2>Kiloli</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Kod</th>
-        <th>Nomi</th>
-        <th>Miqdor (kg)</th>
-        <th>Olish narxi</th>
-        <th>Sotish narxi</th>
-        <th>Amallar</th>
-      </tr>
-    </thead>
-    <tbody id="kiloli-table"></tbody>
-  </table>
+
   <h3 id="remain-summary"></h3>
+  <h3 id="sales-summary"></h3>
+
   <hr />
   <h2>Sotuv</h2>
   <table>
@@ -107,404 +77,266 @@
         <th>Vaqt</th>
         <th>Kod</th>
         <th>Nomi</th>
-        <th>Kv.m²</th>
-        <th>Miqdor</th>
-        <th>So‘m</th>
-        <th>USD</th>
+        <th>Sold Piece</th>
+        <th>Maydon (m²)</th>
+        <th>Summa So‘m</th>
+        <th>Summa USD</th>
       </tr>
     </thead>
     <tbody id="sales-table"></tbody>
   </table>
-  <p>Jami sotilgan: <span id="sold-total"></span></p>
+
   <script>
-    let products = JSON.parse(localStorage.getItem("products") || "[]");
-    let sales = JSON.parse(localStorage.getItem("sales") || "[]");
-    const EPSILON = 0.0001;
+    let products = JSON.parse(localStorage.getItem("products") || "[]"),
+      sales = JSON.parse(localStorage.getItem("sales") || "[]");
 
-    function saveToLocalStorage() {
-      localStorage.setItem("products", JSON.stringify(products));
-      localStorage.setItem("sales", JSON.stringify(sales));
-    }
-
-
-    // Format funksiyalar
     function fmtSom(v) {
-      return Number(v).toLocaleString("uz-UZ") + " so‘m";
+      return Math.round(v).toLocaleString("uz-UZ").replace(/,/g, " ") + " so‘m";
     }
 
     function fmtUsd(v) {
-      return "$" + Number(v).toFixed(2);
-    }
-
-    // Dona miqdorini yaxlitlash
-    function roundQty(q) {
-      const i = Math.floor(q), f = q - i;
-      return f >= 0.5 ? Math.ceil(q) : Math.floor(q);
-    }
-
-    // Kategoriya bo‘yicha jadval ID ni aniqlash
-    function getTableIdByCategory(cat) {
-      switch (cat) {
-        case "donali": return "donali-table";
-        case "pachkali": return "pachkali-table";
-        case "golden_art_floor": return "golden-art-floor-table";
-        case "kiloli": return "kiloli-table";
-        default: return "luxury-table";
+      if (v % 1 === 0) {
+        return "$" + v.toFixed(0);
+      } else {
+        return "$" + v.toFixed(2);
       }
     }
 
-    // Mahsulotlarni jadvalga chiqarish
-    function renderProducts(filter = "") {
-      // Hamma jadvallarni tozalash
-      ["luxury-table", "donali-table", "pachkali-table", "golden-art-floor-table", "kiloli-table"]
-        .forEach(id => document.getElementById(id).innerHTML = "");
+    function roundQty(q) {
+      const i = Math.floor(q),
+        f = q - i;
+      return f >= 0.5 ? Math.ceil(q) : Math.floor(q);
+    }
 
+    function getTableIdByCategory(cat) {
+      return cat === "golden_art_floor" ? "golden-art-floor-table" : "luxury-table";
+    }
+
+    function renderProducts(filter = "") {
+      ["luxury-table", "golden-art-floor-table"].forEach(id => document.getElementById(id).innerHTML = "");
       products.forEach((p, i) => {
         if (filter && !p.code.toLowerCase().includes(filter.toLowerCase())) return;
-
         const tr = document.createElement("tr");
-        const qty = Number(p.quantity) || 0;
-        const totalArea = Number(p.totalArea) || 0;
-
-        let qtyDisplay = (p.category === "kiloli")
-          ? `${qty.toFixed(3)} kg`
-          : `${roundQty(qty)} dona (${totalArea.toFixed(3)} m²)`;
-
-        // Amal tugmalari
-        let actions = "";
-
-        if (p.category === "kiloli") {
-          actions += `<button class="action-btn" onclick="sellByKg(${i})">Kiloda sotish</button>`;
-        } else {
-          if (!["donali", "pachkali"].includes(p.category)) {
-            actions += `<button class="action-btn" onclick="sellByArea(${i})">Kvadrat sotish</button>`;
-          }
-          actions += `<button class="action-btn" onclick="sellByPiece(${i})">Dona sotish</button>`;
-        }
-
-        actions += `
-          <button class="action-btn" onclick="editProduct(${i})">Tahrirlash</button>
-          <button class="action-btn" onclick="deleteProduct(${i})">O‘chirish</button>
-        `;
-
+        const qtyDisplay = roundQty(p.quantity) + " dona (" + (p.totalArea || 0).toFixed(3) + " m²)";
         tr.innerHTML = `
-          <td>${p.code}</td>
-          <td>${p.name}</td>
-          <td>${qtyDisplay}</td>
-          <td>${fmtSom(p.costSom || 0)} / ${fmtUsd(p.costUsd || 0)}</td>
-          <td>${fmtSom(p.saleSom || 0)} / ${fmtUsd(p.saleUsd || 0)}</td>
-          <td>${actions}</td>
-        `;
-
+          <td>${p.code}</td><td>${p.name}</td><td>${qtyDisplay}</td>
+          <td>${fmtSom(p.costSom)} / ${fmtUsd(p.costUsd)}</td>
+          <td>${fmtSom(p.saleSom)} / ${fmtUsd(p.saleUsd)}</td>
+          <td>
+            <button onclick="sellByPiece(${i})">Dona sotish</button>
+            <button onclick="sellByArea(${i})">Kvadrat sotish</button>
+            <button onclick="editProduct(${i})">Tahrirlash</button>
+            <button onclick="deleteProduct(${i})">O‘chirish</button>
+          </td>`;
         document.getElementById(getTableIdByCategory(p.category)).appendChild(tr);
       });
-
       renderRemain();
       renderSales();
     }
 
-    // Omborda qolgan mahsulotlar umumiy statistikasi
     function renderRemain() {
-      let totalQ = 0, totalArea = 0;
-
+      let tq = 0, ta = 0;
       products.forEach(p => {
-        totalQ += Number(p.quantity) || 0;
-        totalArea += Number(p.totalArea) || 0;
+        tq += p.quantity;
+        ta += p.totalArea || 0;
       });
-
-      document.getElementById("remain-summary").textContent =
-        `Omborda qolgan jami: ${totalQ.toFixed(3)} dona / kg, ${totalArea.toFixed(3)} m²`;
+      document.getElementById("remain-summary").textContent = `🧾 Omborda: ${tq.toFixed(2)} dona, ${ta.toFixed(2)} m²`;
     }
+
     function renderSales() {
       const tbl = document.getElementById("sales-table");
       tbl.innerHTML = "";
-
-      let totalQty = 0;
-      let totalArea = 0;
-      let totalSom = 0;
-      let totalUsd = 0;
+      let tq = 0, ta = 0, som = 0, usd = 0;
 
       sales.forEach(s => {
-        const qty = Number(s.quantity) || 0;
-        const som = Number(s.som) || 0;
-        const usd = Number(s.usd) || 0;
-
-        // Mahsulotdan o'lchamni topamiz
-        const relatedProduct = products.find(p => p.code === s.code);
-        const size = relatedProduct?.size || 0;
-
-        // Agar o'lcham 10 dan kichik yoki teng bo'lsa kvadrat metr hisoblanadi
-        const area = s.area !== undefined ? s.area : ((size > 0 && size <= 10) ? (qty * size) : 0);
-
         const tr = document.createElement("tr");
+        const roundedQty = roundQty(s.qty);
         tr.innerHTML = `
-      <td>${new Date(s.date).toLocaleString()}</td>
-      <td>${s.code || ""}</td>
-      <td>${s.name || ""}</td>
-      <td>${area > 0 ? area.toFixed(3) : "-"}</td>
-      <td>${qty.toFixed(3)}</td>
-      <td>${fmtSom(som)}</td>
-      <td>${fmtUsd(usd)}</td>
-    `;
+          <td>${s.time}</td>
+          <td>${s.code || ""}</td>
+          <td>${s.name}</td>
+          <td>${roundedQty} dona (${s.area ? s.area.toFixed(3) : "0.000"} m²)</td>
+          <td>${s.area ? s.area.toFixed(3) : "0.000"} m²</td>
+          <td>${fmtSom(s.sumSom)}</td>
+          <td>${fmtUsd(s.sumUsd)}</td>
+        `;
         tbl.appendChild(tr);
-
-        totalQty += qty;
-        totalArea += area;
-        totalSom += som;
-        totalUsd += usd;
+        tq += roundedQty;
+        ta += s.area || 0;
+        som += s.sumSom;
+        usd += s.sumUsd;
       });
 
-      document.getElementById("sold-total").textContent =
-        `${totalQty.toFixed(3)} dona/kg, ${totalArea.toFixed(3)} m², ${fmtSom(totalSom)}, ${fmtUsd(totalUsd)}`;
+      document.getElementById("sales-summary").textContent =
+        `📈 Jami sotuv: ${tq} dona, ${ta.toFixed(3)} m², ${fmtSom(som)}, ${fmtUsd(usd)}`;
     }
 
-    // Mahsulotni tahrirlash
-    function editProduct(index) {
-      const p = products[index];
+    function addSale(code, name, qty, area, sumSom, sumUsd) {
+      sales.push({ time: new Date().toLocaleString(), code, name, qty, area, sumSom, sumUsd });
+      localStorage.setItem("sales", JSON.stringify(sales));
+    }
 
-      document.getElementById("edit-index").value = index;
+    function sellByPiece(idx) {
+      const p = products[idx];
+      const qty = parseFloat(prompt("Nechta dona sotiladi?", "1"));
+      if (!qty || qty <= 0 || qty > p.quantity) {
+        return alert("Noto‘g‘ri miqdor!");
+      }
+
+      // maydon hisoblanadi dona × 1 dona maydoni
+      const area = qty * p.size;
+
+      // 1 kvadrat narxi = p.saleUsd (sen shu tarzda saqlagan bo‘lsang)
+      const usd = p.saleUsd * area;
+      const som = p.saleSom * area;
+
+      p.quantity -= qty;
+      p.totalArea -= area;
+
+      if (p.quantity <= 0 || p.totalArea <= 0) {
+        products.splice(idx, 1);
+      }
+
+      addSale(p.code, p.name, qty, area, som, usd);
+      localStorage.setItem("products", JSON.stringify(products));
+      renderProducts();
+    }
+
+    function sellByArea(idx) {
+      const p = products[idx];
+      const areaToSell = parseFloat(prompt("Necha m² sotiladi?", "1"));
+      if (!areaToSell || areaToSell <= 0) {
+        return alert("Noto‘g‘ri maydon!");
+      }
+      if (areaToSell > p.totalArea) {
+        return alert("Sotiladigan maydon ombordagi maydondan katta boʻla olmaydi!");
+      }
+
+      const qtySold = areaToSell / p.size;
+
+      // 1 kvadrat narxi = p.saleUsd
+      const usd = p.saleUsd * areaToSell;
+      const som = p.saleSom * areaToSell;
+
+      p.quantity -= qtySold;
+      p.totalArea -= areaToSell;
+
+      if (p.quantity <= 0 || p.totalArea <= 0) {
+        products.splice(idx, 1);
+      }
+
+      addSale(p.code, p.name, qtySold, areaToSell, som, usd);
+      localStorage.setItem("products", JSON.stringify(products));
+      renderProducts();
+    }
+
+    function editProduct(idx) {
+      const p = products[idx];
+      document.getElementById("edit-index").value = idx;
       document.getElementById("product-code").value = p.code;
       document.getElementById("product-name").value = p.name;
-      document.getElementById("product-size").value = p.size || 0;
-      document.getElementById("product-quantity").value = p.quantity || 0;
-      document.getElementById("product-cost-price-usd").value = p.costUsd || 0;
-      document.getElementById("product-sale-price-usd").value = p.saleUsd || 0;
-      document.getElementById("dollar-rate").value = p.dollarRate || 12500;
+      document.getElementById("product-size").value = p.size;
+      document.getElementById("product-quantity").value = p.quantity;
+      document.getElementById("product-cost-price-usd").value = p.costUsd;
+      document.getElementById("product-sale-price-usd").value = p.saleUsd;
+      document.getElementById("dollar-rate").value = p.dollarRate;
       document.getElementById("product-category").value = p.category;
     }
 
-    // Mahsulotni o‘chirish
-    function deleteProduct(index) {
-      if (confirm("Haqiqatan ham ushbu mahsulotni o‘chirmoqchimisiz?")) {
-        products.splice(index, 1);
-        saveToLocalStorage();
+    function deleteProduct(idx) {
+      if (confirm("O‘chirishga ishonchingiz komilmi?")) {
+        products.splice(idx, 1);
+        localStorage.setItem("products", JSON.stringify(products));
         renderProducts();
       }
     }
 
-    // Formani yuborish (saqlash yoki tahrirlash)
     document.getElementById("product-form").addEventListener("submit", function (e) {
       e.preventDefault();
-
-      const index = document.getElementById("edit-index").value;
-      const code = document.getElementById("product-code").value.trim();
-      const name = document.getElementById("product-name").value.trim();
-      const size = parseFloat(document.getElementById("product-size").value) || 0;
-      const quantity = parseFloat(document.getElementById("product-quantity").value) || 0;
-      const costUsd = parseFloat(document.getElementById("product-cost-price-usd").value) || 0;
-      const saleUsd = parseFloat(document.getElementById("product-sale-price-usd").value) || 0;
-      const dollarRate = parseFloat(document.getElementById("dollar-rate").value) || 12500;
-      const category = document.getElementById("product-category").value;
-
-      const costSom = costUsd * dollarRate;
-      const saleSom = saleUsd * dollarRate;
-      const totalArea = size * quantity;
-
-      const productData = {
-        code,
-        name,
-        size,
-        quantity,
-        costUsd,
-        costSom,
-        saleUsd,
-        saleSom,
-        dollarRate,
-        category,
-        totalArea
+      const idx = document.getElementById("edit-index").value;
+      const pd = {
+        code: document.getElementById("product-code").value.trim(),
+        name: document.getElementById("product-name").value.trim(),
+        size: parseFloat(document.getElementById("product-size").value),
+        quantity: parseFloat(document.getElementById("product-quantity").value),
+        costUsd: parseFloat(document.getElementById("product-cost-price-usd").value) || 0,
+        saleUsd: parseFloat(document.getElementById("product-sale-price-usd").value) || 0,
+        dollarRate: parseFloat(document.getElementById("dollar-rate").value),
+        category: document.getElementById("product-category").value
       };
+      pd.costSom = pd.costUsd * pd.dollarRate;
+      pd.saleSom = pd.saleUsd * pd.dollarRate;
+      pd.totalArea = pd.quantity * pd.size;
 
-      if (index === "") {
-        products.push(productData);
-      } else {
-        products[index] = productData;
-      }
+      if (idx !== "") products[idx] = pd;
+      else products.push(pd);
 
-      saveToLocalStorage();
-      renderProducts();
+      localStorage.setItem("products", JSON.stringify(products));
       this.reset();
       document.getElementById("edit-index").value = "";
+      renderProducts();
     });
 
-    // Kiloda sotish
-    function sellByKg(index) {
-      const p = products[index];
-      const sellQty = parseFloat(prompt(`Necha kg sotilsin? (Mavjud: ${p.quantity.toFixed(3)} kg)`));
-
-      if (isNaN(sellQty) || sellQty <= 0) return alert("To‘g‘ri kg kiriting.");
-      if (sellQty > p.quantity + EPSILON) return alert("Omborda bu miqdorda mahsulot yo‘q.");
-
-      p.quantity -= sellQty;
-
-      if (p.quantity < EPSILON) {
-        products.splice(index, 1);
-      }
-
-      sales.push({
-        date: new Date().toISOString(),
-        code: p.code,
-        name: p.name,
-        quantity: quantityToSell, //kiloli
-        som: p.saleSom * quantityToSell,
-        usd: p.saleUsd * quantityToSell
-      });
-
-
-      saveToLocalStorage();
-      renderProducts();
-      renderSales();
-    }
-    function sellByArea(index) {
-      const p = products[index];
-      const sellArea = parseFloat(prompt(`Necha kvadrat metr sotilsin? (Mavjud: ${p.totalArea.toFixed(3)} m²)`));
-
-      if (isNaN(sellArea) || sellArea <= 0) return alert("To‘g‘ri miqdor kiriting.");
-      if (sellArea > p.totalArea + EPSILON) return alert("Omborda bu miqdorda mahsulot yo‘q.");
-
-      const sellPricePerM2 = p.saleUsd;  // Sotuv narxi per m² (USD)
-      const size = p.size;              // Mahsulot o‘lchami (1 dona necha kvadrat metr)
-
-      // Sotilgan maydonning qiymatini hisoblash (so‘m va USD)
-      const som = sellPricePerM2 * sellArea * p.dollarRate;
-      const usd = sellPricePerM2 * sellArea;
-
-      // Sotilgan maydonni sotishdan keyin yangilash
-      p.totalArea -= sellArea;
-
-      // Maydonni donaga o‘zgartirish (agar maydonni sotgan bo‘lsak, unda donalar miqdorini ham yangilaymiz)
-      const quantityToSell = sellArea / size;
-      p.quantity -= quantityToSell;
-
-      // Sotishdan keyin 0 ga teng bo‘lgan miqdorni olib tashlash
-      if (p.quantity < EPSILON) {
-        p.quantity = 0;
-      }
-      if (p.totalArea < EPSILON) {
-        p.totalArea = 0;
-      }
-
-      // Sotishni ro‘yxatga qo‘shish
-      sales.push({
-        date: new Date().toISOString(),
-        code: p.code,
-        name: p.name,
-        area: sellArea,    // Kvadrat metr bo‘yicha sotildi
-        quantity: quantityToSell,    // Sotilgan dona miqdori
-        som: som,
-        usd: usd
-      });
-
-      saveToLocalStorage();
-      renderProducts();
-      renderSales();
-    }
-
-
-    function sellByPiece(index) {
-      const p = products[index];
-      const sellQty = parseInt(prompt(`Necha dona sotilsin? (Mavjud: ${roundQty(p.quantity)} dona)`));
-
-      if (isNaN(sellQty) || sellQty <= 0) return alert("To‘g‘ri miqdor kiriting.");
-      if (sellQty > roundQty(p.quantity)) return alert("Omborda bu miqdorda mahsulot yo‘q.");
-
-      const sellPricePerPiece = p.saleUsd;  // Sotuv narxi per dona (USD)
-      const size = p.size;  // Mahsulot o‘lchami (kvadrat metr bo‘yicha)
-
-      // Sotilgan donalar qiymatini hisoblash (so‘m va USD)
-      const som = sellPricePerPiece * sellQty * p.dollarRate;
-      const usd = sellPricePerPiece * sellQty;
-
-      // Sotishdan keyin donalar va maydonni yangilash
-      p.quantity -= sellQty;
-      p.totalArea -= size * sellQty;
-
-      if (p.quantity < EPSILON) {
-        p.quantity = 0;  // Agar dona miqdori 0 ga teng bo‘lsa, mahsulotni olib tashlaymiz
-      }
-      if (p.totalArea < EPSILON) {
-        p.totalArea = 0;
-      }
-
-      // Sotishni ro‘yxatga qo‘shish
-      sales.push({
-        date: new Date().toISOString(),
-        code: p.code,
-        name: p.name,
-        area: 0,           // Sotilgan maydon 0 (dona sotildi)
-        quantity: sellQty, // Sotilgan dona miqdori
-        som: som,
-        usd: usd
-      });
-
-      saveToLocalStorage();
-      renderProducts();
-      renderSales();
-    }
-
-
-
-
-    document.getElementById("search-code").addEventListener("input", function () {
-      renderProducts(this.value.trim());
+    document.getElementById("search-code").addEventListener("input", e => {
+      renderProducts(e.target.value.trim());
     });
 
-
-    document.getElementById("save-sales-pdf").addEventListener("click", function () {
+    document.getElementById("save-pdf").addEventListener("click", () => {
+      if (sales.length === 0) {
+        alert("Sotilgan mahsulotlar yo‘q!");
+        return;
+      }
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
+      doc.setFontSize(14);
+      doc.text(`📦 Sotuvlar hisobot (${new Date().toLocaleDateString()})`, 10, 10);
 
-      doc.text("Sotilgan mahsulotlar ro'yxati", 14, 15);
-
-      const columns = ["Vaqt", "Kod", "Nomi", "Miqdor", "Kv.m²", "So'm", "USD"];
-
-      let totalQty = 0;
-      let totalArea = 0;
-      let totalSom = 0;
-      let totalUsd = 0;
-
-      const rows = sales.map(s => {
-        const qty = Number(s.quantity) || 0;
-        const som = Number(s.som) || 0;
-        const usd = Number(s.usd) || 0;
-
-        totalQty += qty;
-        totalSom += som;
-        totalUsd += usd;
-
-        const relatedProduct = products.find(p => p.code === s.code);
-        const size = relatedProduct?.size || 0;
-        const area = (size > 0 && size <= 10) ? (qty * size) : 0;
-
-        totalArea += area;
-
+      const head = [[
+        "Sana", "Kod", "Mahsulot nomi", "Sold (dona)", "Maydon (m²)", "Summa USD", "Summa So'm"
+      ]];
+      const body = sales.map(s => {
+        const roundedQty = roundQty(s.qty);
         return [
-          new Date(s.date).toLocaleString(),
-          s.code,
+          s.time,
+          s.code || "",
           s.name,
-          qty.toFixed(3),
-          area ? area.toFixed(3) : "-",
-          fmtSom(som),
-          fmtUsd(usd)
+          roundedQty.toString(),
+          (s.area ? s.area.toFixed(3) : "0.000"),
+          fmtUsd(s.sumUsd),
+          fmtSom(s.sumSom)
         ];
       });
 
       doc.autoTable({
-        head: [columns],
-        body: rows,
+        head: head,
+        body: body,
         startY: 20,
-        styles: { fontSize: 8 },
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [220, 220, 220] }
       });
 
-      doc.setFontSize(10);
-      doc.text(`Umumiy miqdor: ${totalQty.toFixed(3)} dona/kg`, 14, doc.lastAutoTable.finalY + 10);
-      doc.text(`Umumiy kvadrat metr: ${totalArea.toFixed(3)} m²`, 14, doc.lastAutoTable.finalY + 16);
-      doc.text(`Umumiy summa: ${fmtSom(totalSom)} / ${fmtUsd(totalUsd)}`, 14, doc.lastAutoTable.finalY + 22);
+      let jamiDona = 0, jamiKvadrat = 0, jamiUsd = 0, jamiSom = 0;
+      sales.forEach(s => {
+        jamiDona += roundQty(s.qty);
+        jamiKvadrat += s.area || 0;
+        jamiUsd += s.sumUsd;
+        jamiSom += s.sumSom;
+      });
 
-      doc.save("sotilganlar.pdf");
+      const finalY = doc.previousAutoTable
+        ? doc.previousAutoTable.finalY + 10
+        : doc.lastAutoTable
+          ? doc.lastAutoTable.finalY + 10
+          : 20 + body.length * 7 + 20;
+
+      doc.setFontSize(12);
+      doc.text(`Jami: ${jamiDona} dona, ${jamiKvadrat.toFixed(3)} m², ${fmtUsd(jamiUsd)}, ${fmtSom(jamiSom)}`, 10, finalY);
+
+      const filename = `sotuvlar_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
     });
 
     renderProducts();
-    renderSales();
   </script>
 </body>
 
