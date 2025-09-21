@@ -4,8 +4,10 @@
 <head>
   <meta charset="UTF-8" />
   <title>Ombor boshqaruvi</title>
+  <!-- jsPDF + AutoTable -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
@@ -32,7 +34,7 @@
   <hr />
 
   <label>Kodni qidirish: <input type="text" id="search-code" placeholder="Kod..." /></label>
-  <button id="save-pdf">📑 PDF saqlash</button>
+  <button id="save-pdf">📑 PDF saqlash (har kunlik)</button>
 
   <h2>Luxury</h2>
   <table>
@@ -63,6 +65,7 @@
     </thead>
     <tbody id="golden-art-floor-table"></tbody>
   </table>
+
   <h3 id="remain-summary"></h3>
   <h3 id="sales-summary"></h3>
 
@@ -72,10 +75,12 @@
     <thead>
       <tr>
         <th>Vaqt</th>
+        <th>Kod</th>
         <th>Nomi</th>
-        <th>Miqdor</th>
-        <th>So‘m</th>
-        <th>USD</th>
+        <th>Sold Piece</th>
+        <th>Maydon (m²)</th>
+        <th>Summa So‘m</th>
+        <th>Summa USD</th>
       </tr>
     </thead>
     <tbody id="sales-table"></tbody>
@@ -84,6 +89,7 @@
   <script>
     let products = JSON.parse(localStorage.getItem("products") || "[]"),
       sales = JSON.parse(localStorage.getItem("sales") || "[]");
+
     function fmtSom(v) {
       return Math.round(v).toLocaleString("uz-UZ").replace(/,/g, " ") + " so‘m";
     }
@@ -96,7 +102,11 @@
       }
     }
 
-    function roundQty(q) { const i = Math.floor(q), f = q - i; return f >= 0.5 ? Math.ceil(q) : Math.floor(q); }
+    function roundQty(q) {
+      const i = Math.floor(q),
+        f = q - i;
+      return f >= 0.5 ? Math.ceil(q) : Math.floor(q);
+    }
 
     function getTableIdByCategory(cat) {
       return cat === "golden_art_floor" ? "golden-art-floor-table" : "luxury-table";
@@ -126,7 +136,10 @@
 
     function renderRemain() {
       let tq = 0, ta = 0;
-      products.forEach(p => { tq += p.quantity; ta += p.totalArea || 0; });
+      products.forEach(p => {
+        tq += p.quantity;
+        ta += p.totalArea || 0;
+      });
       document.getElementById("remain-summary").textContent = `🧾 Omborda: ${tq.toFixed(2)} dona, ${ta.toFixed(2)} m²`;
     }
 
@@ -134,49 +147,85 @@
       const tbl = document.getElementById("sales-table");
       tbl.innerHTML = "";
       let tq = 0, ta = 0, som = 0, usd = 0;
+
       sales.forEach(s => {
         const tr = document.createElement("tr");
+        const roundedQty = roundQty(s.qty);
         tr.innerHTML = `
-          <td>${s.time}</td><td>${s.name}</td><td>${s.qty.toFixed(2)} ${s.unit}</td>
-          <td>${fmtSom(s.sumSom)}</td><td>${fmtUsd(s.sumUsd)}</td>`;
+          <td>${s.time}</td>
+          <td>${s.code || ""}</td>
+          <td>${s.name}</td>
+          <td>${roundedQty} dona (${s.area ? s.area.toFixed(3) : "0.000"} m²)</td>
+          <td>${s.area ? s.area.toFixed(3) : "0.000"} m²</td>
+          <td>${fmtSom(s.sumSom)}</td>
+          <td>${fmtUsd(s.sumUsd)}</td>
+        `;
         tbl.appendChild(tr);
-        tq += s.qty; ta += s.area || 0; som += s.sumSom; usd += s.sumUsd;
+        tq += roundedQty;
+        ta += s.area || 0;
+        som += s.sumSom;
+        usd += s.sumUsd;
       });
+
       document.getElementById("sales-summary").textContent =
-        `📈 Jami sotuv: ${tq.toFixed(2)} dona, ${ta.toFixed(2)} m², ${fmtSom(som)}, ${fmtUsd(usd)}`;
+        `📈 Jami sotuv: ${tq} dona, ${ta.toFixed(3)} m², ${fmtSom(som)}, ${fmtUsd(usd)}`;
     }
 
-    function addSale(name, qty, area, sumSom, sumUsd, unit) {
-      sales.push({ time: new Date().toLocaleString(), name, qty, area, sumSom, sumUsd, unit });
+    function addSale(code, name, qty, area, sumSom, sumUsd) {
+      sales.push({ time: new Date().toLocaleString(), code, name, qty, area, sumSom, sumUsd });
       localStorage.setItem("sales", JSON.stringify(sales));
     }
 
     function sellByPiece(idx) {
       const p = products[idx];
       const qty = parseFloat(prompt("Nechta dona sotiladi?", "1"));
-      if (!qty || qty <= 0 || qty > p.quantity) return alert("Noto‘g‘ri miqdor!");
+      if (!qty || qty <= 0 || qty > p.quantity) {
+        return alert("Noto‘g‘ri miqdor!");
+      }
+
+      // maydon hisoblanadi dona × 1 dona maydoni
       const area = qty * p.size;
-      const som = (p.saleSom / p.quantity) * qty;
-      const usd = (p.saleUsd / p.quantity) * qty;
+
+      // 1 kvadrat narxi = p.saleUsd (sen shu tarzda saqlagan bo‘lsang)
+      const usd = p.saleUsd * area;
+      const som = p.saleSom * area;
+
       p.quantity -= qty;
       p.totalArea -= area;
-      if (p.quantity <= 0 || p.totalArea <= 0) products.splice(idx, 1);
-      addSale(p.name, qty, area, som, usd, "dona");
+
+      if (p.quantity <= 0 || p.totalArea <= 0) {
+        products.splice(idx, 1);
+      }
+
+      addSale(p.code, p.name, qty, area, som, usd);
       localStorage.setItem("products", JSON.stringify(products));
       renderProducts();
     }
 
     function sellByArea(idx) {
       const p = products[idx];
-      const area = parseFloat(prompt("Necha m² sotiladi?", "1"));
-      if (!area || area <= 0 || area > p.totalArea) return alert("Noto‘g‘ri metr!");
-      const qty = area / p.size;
-      const som = (p.saleSom / p.quantity) * qty;
-      const usd = (p.saleUsd / p.quantity) * qty;
-      p.quantity -= qty;
-      p.totalArea -= area;
-      if (p.quantity <= 0 || p.totalArea <= 0) products.splice(idx, 1);
-      addSale(p.name, qty, area, som, usd, "m²");
+      const areaToSell = parseFloat(prompt("Necha m² sotiladi?", "1"));
+      if (!areaToSell || areaToSell <= 0) {
+        return alert("Noto‘g‘ri maydon!");
+      }
+      if (areaToSell > p.totalArea) {
+        return alert("Sotiladigan maydon ombordagi maydondan katta boʻla olmaydi!");
+      }
+
+      const qtySold = areaToSell / p.size;
+
+      // 1 kvadrat narxi = p.saleUsd
+      const usd = p.saleUsd * areaToSell;
+      const som = p.saleSom * areaToSell;
+
+      p.quantity -= qtySold;
+      p.totalArea -= areaToSell;
+
+      if (p.quantity <= 0 || p.totalArea <= 0) {
+        products.splice(idx, 1);
+      }
+
+      addSale(p.code, p.name, qtySold, areaToSell, som, usd);
       localStorage.setItem("products", JSON.stringify(products));
       renderProducts();
     }
@@ -219,8 +268,9 @@
       pd.saleSom = pd.saleUsd * pd.dollarRate;
       pd.totalArea = pd.quantity * pd.size;
 
-      if (idx) products[idx] = pd;
+      if (idx !== "") products[idx] = pd;
       else products.push(pd);
+
       localStorage.setItem("products", JSON.stringify(products));
       this.reset();
       document.getElementById("edit-index").value = "";
@@ -232,56 +282,58 @@
     });
 
     document.getElementById("save-pdf").addEventListener("click", () => {
-      if (sales.length === 0) return alert("Sotilgan mahsulotlar yo‘q!");
+      if (sales.length === 0) {
+        alert("Sotilgan mahsulotlar yo‘q!");
+        return;
+      }
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-      doc.setFontSize(12);
+      doc.setFontSize(14);
+      doc.text(`📦 Sotuvlar hisobot (${new Date().toLocaleDateString()})`, 10, 10);
 
-      doc.text("Sotilgan mahsulotlar ro‘yxati", 10, 10);
-      let y = 20;
-      sales.forEach(s => {
-        doc.text(`Vaqt: ${s.time}`, 10, y);
-        y += 7;
-        doc.text(`Nomi: ${s.name}`, 10, y);
-        y += 7;
-        doc.text(`Sotildi: ${s.qty.toFixed(2)} ${s.unit}`, 10, y);
-        y += 7;
-        if (s.area) {
-          doc.text(`Kvadrati: ${s.area.toFixed(3)} m²`, 10, y);
-          y += 7;
-        }
-        doc.text(`Summa: ${fmtSom(s.sumSom)} | ${fmtUsd(s.sumUsd)}`, 10, y);
-        y += 10;
-
-        if (y > 270) {
-          doc.addPage();
-          y = 10;
-        }
+      const head = [[
+        "Sana", "Kod", "Mahsulot nomi", "Sold (dona)", "Maydon (m²)", "Summa USD", "Summa So'm"
+      ]];
+      const body = sales.map(s => {
+        const roundedQty = roundQty(s.qty);
+        return [
+          s.time,
+          s.code || "",
+          s.name,
+          roundedQty.toString(),
+          (s.area ? s.area.toFixed(3) : "0.000"),
+          fmtUsd(s.sumUsd),
+          fmtSom(s.sumSom)
+        ];
       });
 
-      let jamiDona = 0, jamiKvadrat = 0, jamiSom = 0, jamiUsd = 0;
+      doc.autoTable({
+        head: head,
+        body: body,
+        startY: 20,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [220, 220, 220] }
+      });
+
+      let jamiDona = 0, jamiKvadrat = 0, jamiUsd = 0, jamiSom = 0;
       sales.forEach(s => {
-        jamiDona += (s.unit === "dona") ? s.qty : 0;
-        jamiKvadrat += (s.unit === "m²") ? s.qty : 0;
-        jamiSom += s.sumSom;
+        jamiDona += roundQty(s.qty);
+        jamiKvadrat += s.area || 0;
         jamiUsd += s.sumUsd;
+        jamiSom += s.sumSom;
       });
 
-      doc.text("📈 Jami sotilganlar statistikasi:", 10, y);
-      y += 7;
-      doc.text(`Jami dona: ${jamiDona.toFixed(2)} dona`, 10, y);
-      y += 7;
-      doc.text(`Jami kvadrati: ${jamiKvadrat.toFixed(3)} m²`, 10, y);
-      y += 7;
-      doc.text(`Jami summa: ${fmtSom(jamiSom)} | ${fmtUsd(jamiUsd)}`, 10, y);
+      const finalY = doc.previousAutoTable
+        ? doc.previousAutoTable.finalY + 10
+        : doc.lastAutoTable
+          ? doc.lastAutoTable.finalY + 10
+          : 20 + body.length * 7 + 20;
 
-      doc.save("sotilganlar.pdf");
-    });
+      doc.setFontSize(12);
+      doc.text(`Jami: ${jamiDona} dona, ${jamiKvadrat.toFixed(3)} m², ${fmtUsd(jamiUsd)}, ${fmtSom(jamiSom)}`, 10, finalY);
 
-
-    document.getElementById("logout-btn").addEventListener("click", () => {
-      if (confirm("Chiqishga ishonchingiz komilmi?")) {
-        }
+      const filename = `sotuvlar_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
     });
 
     renderProducts();
